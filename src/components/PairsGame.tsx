@@ -39,9 +39,6 @@ export default function PairsGame() {
         setTimeOfGameStart(timeSinceFirstLoad);
     }
 
-    function areTwoCardsFaceUp() {
-        return turnStatus.title === 'twoTurned';
-    }
     function cardsRemain() {
         return deck.filter(c => !c.isRemoved).length > 0;
     }
@@ -56,19 +53,18 @@ export default function PairsGame() {
     }
 
     // function handleKeyDown() {
-    // Stale closure - this function definition is passed around and has closure over the var environment of a previous invocation of the PairsGame component function execution,
-    // with old values for turnStatus.
+    //     // Stale closure - this function definition is passed around and has closure over the var environment of a previous invocation of the PairsGame component function execution,
+    //     // with old values for turnStatus.
     //     console.log('handleKeyDown in PairsGame', { turnStatus })
-    //     if (areTwoCardsFaceUp()) {
+    //     if (turnStatus.title === 'twoTurned') {
     //         console.log('yes two are face up')
-    //         handleTurnedTwoCards()
+    //         handleClickWhenTwoCardsFaceUp()
     //     }
     // }
 
-    function handleTurnedTwoCards() {
+    function handleClickWhenTwoCardsFaceUp() {
 
         if (turnStatus.title === 'twoTurned') {
-
             const { firstCard: a, secondCard: b } = turnStatus;
             if (a.emoji === b.emoji) {
                 //TODO: don't mutate card states
@@ -88,14 +84,14 @@ export default function PairsGame() {
 
     function handleClickOnMat() {
         if (turnStatus.title === 'twoTurned') {
-            handleTurnedTwoCards();
+            handleClickWhenTwoCardsFaceUp();
             return;
         }
     }
 
     function handleClickCard(c: Card) {
         if (turnStatus.title === 'twoTurned') {
-            handleTurnedTwoCards();
+            handleClickWhenTwoCardsFaceUp();
             return;
         }
 
