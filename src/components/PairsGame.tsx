@@ -61,11 +61,11 @@ export default function PairsGame() {
     //     console.log('handleKeyDown in PairsGame', { turnStatus })
     //     if (areTwoCardsFaceUp()) {
     //         console.log('yes two are face up')
-    //         handleAcknowledge()
+    //         handleTurnedTwoCards()
     //     }
     // }
 
-    function handleAcknowledge() {
+    function handleTurnedTwoCards() {
 
         if (turnStatus.title === 'twoTurned') {
 
@@ -86,8 +86,16 @@ export default function PairsGame() {
         }
     }
 
+    function handleClickOnMat() {
+        if (turnStatus.title === 'twoTurned') {
+            handleTurnedTwoCards();
+            return;
+        }
+    }
+
     function handleClickCard(c: Card) {
         if (turnStatus.title === 'twoTurned') {
+            handleTurnedTwoCards();
             return;
         }
 
@@ -113,8 +121,9 @@ export default function PairsGame() {
         }
     }
 
+
     return (
-        <div className="mat">
+        <div className="mat" onClick={handleClickOnMat}>
             <div className="cardset">
                 {deck.map((c, ix) => (
                     <CardView card={c} key={ix} handleClickCard={handleClickCard} />
@@ -123,12 +132,6 @@ export default function PairsGame() {
             <div>TurnStatus: {turnStatus.title}</div>
             <div>Click count: {clickCount}</div>
             {timeOfGameStart && <div>Elapsed Time: {timeSinceFirstLoad - timeOfGameStart}</div>}
-            <button
-                className={areTwoCardsFaceUp() ? 'show' : 'hide'}
-                onClick={handleAcknowledge}
-            >
-                acknowledge
-            </button>
             <LeaderboardView leaderboard={leaderboard} />
         </div>
     );
