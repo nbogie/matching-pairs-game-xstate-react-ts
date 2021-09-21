@@ -1,13 +1,15 @@
 import emojis, { Emoji } from './emojis';
 import React, { useState } from 'react';
 //differentiated union type
-type PickStatus =
-    | { status: 'starting' }
-    | { status: 'partial'; card: Card }
-    | { status: 'full'; firstCard: Card; secondCard: Card };
+
+/** Whether a card has been turned, or two, or none yet.*/
+type TurnStatus =
+    | { title: 'noneTurned' }
+    | { title: 'oneTurned'; firstCard: Card }
+    | { title: 'twoTurned'; firstCard: Card; secondCard: Card };
 
 interface Card {
-    isFlipped: boolean;
+    isFaceUp: boolean;
     emoji: string;
     id: number;
     isRemoved: boolean;
@@ -15,8 +17,8 @@ interface Card {
 
 export default function PairsGame() {
     const [clickCount, setClickCount] = useState(0);
-    const [pickStatus, setPickStatus] = useState<PickStatus>({
-        status: 'starting'
+    const [turnStatus, setTurnStatus] = useState<TurnStatus>({
+        title: 'noneTurned'
     });
 
     const [deck, setDeck] = useState<Card[]>(makeEmojisDeck());
@@ -24,11 +26,11 @@ export default function PairsGame() {
     function resetGame() {
         setClickCount(0);
         setDeck(makeEmojisDeck());
-        setPickStatus({ status: 'starting' });
+        setTurnStatus({ title: 'noneTurned' });
     }
 
-    function isEndOfPair() {
-        return pickStatus.status === 'full';
+    function areTwoCardsFaceUp() {
+        return turnStatus.title === 'twoTurned';
     }
     function cardsRemain() {
         return deck.filter(c => !c.isRemoved).length > 0;
@@ -39,11 +41,11 @@ export default function PairsGame() {
     }
     function makeEmojisDeck(): Card[] {
         const emojisToUse = [...emojis]
-            .sort((a, b) => Math.random() - 0.5)
-            .slice(0, 8);
+            .sort((a, b) => Math.random() - 0.5) //shuffle
+            .slice(0, 8); //take 8 emojis.  We'll instantiate double to make the deck.
 
         function makeEmojiCard(e: Emoji, id: number): Card {
-            return { emoji: e, id, isFlipped: false, isRemoved: false };
+            return { emoji: e, id, isFaceUp: false, isRemoved: false };
         }
         return shuffle(
             emojisToUse.flatMap((e, ix) => [
@@ -54,51 +56,45 @@ export default function PairsGame() {
     }
 
     function handleAcknowledge() {
-        if (pickStatus.status === 'full') {
-            const firstCard = pickStatus.firstCard;
-            const secondCard = pickStatus.secondCard;
-            const [a, b] = [firstCard, secondCard];
+        if (turnStatus.title === 'twoTurned') {
+            const { firstCard: a, secondCard: b } = turnStatus;
             if (a.emoji === b.emoji) {
                 a.isRemoved = true;
                 b.isRemoved = true;
-                a.isFlipped = false;
-                b.isFlipped = false;
-            } else {
-                a.isFlipped = false;
-                b.isFlipped = false;
             }
-            setPickStatus({ status: 'starting' });
+            //in either case, unflip.
+            a.isFaceUp = false;
+            b.isFaceUp = false;
+            setTurnStatus({ title: 'noneTurned' });
             if (!cardsRemain()) {
                 resetGame();
             }
-            return;
         }
     }
 
-    function handleClick(c: Card) {
+    function handleClickCard(c: Card) {
+        if (turnStatus.title === 'twoTurned') {
+            return;
+        }
+
         if (c.isRemoved) {
             console.log('card has been removed!');
             return;
         }
-        if (pickStatus.status === 'full') {
+
+        if (c.isFaceUp) {
             return;
         }
 
-        if (c.isFlipped) {
+        c.isFaceUp = true;
+        setClickCount(prev => prev + 1);
+
+        if (turnStatus.title === 'noneTurned') {
+            setTurnStatus({ title: 'oneTurned', firstCard: c });
             return;
         }
-
-        c.isFlipped = true;
-
-        if (pickStatus.status === 'starting') {
-            setClickCount(prev => prev + 1);
-            setPickStatus({ status: 'partial', card: c });
-            return;
-        }
-        if (pickStatus.status === 'partial') {
-            setClickCount(prev => prev + 1);
-            const first = pickStatus.card;
-            setPickStatus({ status: 'full', firstCard: first, secondCard: c });
+        if (turnStatus.title === 'oneTurned') {
+            setTurnStatus({ title: 'twoTurned', firstCard: turnStatus.firstCard, secondCard: c });
             return;
         }
     }
@@ -107,13 +103,13 @@ export default function PairsGame() {
         <div className="mat">
             <div className="cardset">
                 {deck.map((c, ix) => (
-                    <CardView card={c} key={ix} handleClick={handleClick} />
+                    <CardView card={c} key={ix} handleClickCard={handleClickCard} />
                 ))}
             </div>
-            <div>PickStatus: {pickStatus.status}</div>
+            <div>TurnStatus: {turnStatus.title}</div>
             <div>Click count: {clickCount}</div>
             <button
-                className={isEndOfPair() ? 'show' : 'hide'}
+                className={areTwoCardsFaceUp() ? 'show' : 'hide'}
                 onClick={handleAcknowledge}
             >
                 acknowledge
@@ -122,16 +118,16 @@ export default function PairsGame() {
     );
 }
 interface CardProps {
-    handleClick: (c: Card) => void;
+    handleClickCard: (c: Card) => void;
     card: Card;
 }
 function CardView(props: CardProps) {
     return (
         <div
-            onClick={() => props.handleClick(props.card)}
+            onClick={() => props.handleClickCard(props.card)}
             className={
                 'card ' +
-                (props.card.isFlipped ? 'flipped' : '') +
+                (props.card.isFaceUp ? 'face-up' : '') +
                 ' ' +
                 (props.card.isRemoved ? 'removed' : '')
             }

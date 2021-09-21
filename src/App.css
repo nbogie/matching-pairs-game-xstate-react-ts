@@ -35,7 +35,7 @@ p {
   font-size: 50px;
   box-shadow: 3px 0px 8px 3px #444;
 }
-.card.flipped {
+.card.face-up {
   background: white;
 }
 .card.removed {
