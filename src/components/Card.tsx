@@ -12,7 +12,10 @@ export interface CardProps {
 export function CardView(props: CardProps) {
     return (
         <div
-            onClick={() => props.handleClickCard(props.card)}
+            onClick={(event) => {
+                event.stopPropagation();
+                props.handleClickCard(props.card);
+            }}
             className={
                 'card ' +
                 (props.card.isFaceUp ? 'face-up' : '') +
