@@ -1,5 +1,5 @@
 import { Card } from "./Card";
-import emojis, { Emoji } from './emojis';
+import emojis, { Emoji } from '../emojis';
 
 export function makeEmojisDeck(): Card[] {
     const emojisToUse = [...emojis]
@@ -9,6 +9,7 @@ export function makeEmojisDeck(): Card[] {
     function makeEmojiCard(e: Emoji, id: number): Card {
         return { emoji: e, id, isFaceUp: false, isRemoved: false };
     }
+
     return shuffle(
         emojisToUse.flatMap((e, ix) => [
             makeEmojiCard(e, 2 * ix),
