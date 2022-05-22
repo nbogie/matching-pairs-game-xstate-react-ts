@@ -6,13 +6,18 @@ import { inspect } from '@xstate/inspect';
 import { createMachine, assign } from "xstate";
 
 export interface PairsGameContext {
-    firstCard: Card | null;
-    secondCard: Card | null;
+    turnStatus: TurnStatus,
     allCards: Card[],
 }
 type PairEvents =
     | { type: "clickCard", card: Card }
     | { type: "cheat" };
+
+type TurnStatus =
+    | { title: 'noneTurned' }
+    | { title: 'oneTurned'; firstCard: Card }
+    | { title: 'twoTurned'; firstCard: Card; secondCard: Card };
+
 
 inspect({ iframe: false });
 const pairsMachine =
@@ -91,42 +96,56 @@ const pairsMachine =
     },
         {
             guards: {
-                pairMatch: (ctx, event) => ctx.firstCard?.emoji === ctx.secondCard?.emoji,
+                pairMatch: (ctx, event) => ctx.turnStatus.title === "twoTurned" && ctx.turnStatus.firstCard.emoji === ctx.turnStatus.secondCard.emoji,
                 isGameOver: (ctx, event) => ctx.allCards.every(c => c.isRemoved),
-                isDifferentCard: (ctx, event) => ctx.firstCard ? (ctx.firstCard.id !== event.card.id) : false
+                isDifferentCard: (ctx, event) => ctx.turnStatus.title === "oneTurned" && ctx.turnStatus.firstCard.id !== event.card.id
             },
             actions: {
                 setupGame: assign(() => ({
-                    firstCard: null,
-                    secondCard: null,
+                    turnStatus: { title: "noneTurned" },
                     allCards: makeEmojisDeck(),
                 })),
                 onPairSuccess: assign((ctx, event) => {
                     //TODO: can't we have TS know that first and second card are
                     // non-null from the action that gets us here?
-                    if (ctx.firstCard && ctx.secondCard) {
-                        ctx.firstCard.isRemoved = true;
-                        ctx.secondCard.isRemoved = true;
+                    if (ctx.turnStatus.title === "twoTurned") {
+                        ctx.turnStatus.firstCard.isRemoved = true;
+                        ctx.turnStatus.secondCard.isRemoved = true;
                     }
-                    return { firstCard: null, secondCard: null }
+                    return {
+                        turnStatus: { title: "noneTurned" } as TurnStatus
+                    }
                 }),
                 onPairFailure: assign((ctx, event) => {
-                    if (ctx.firstCard && ctx.secondCard) {
-                        ctx.firstCard.isFaceUp = false;
-                        ctx.secondCard.isFaceUp = false;
+                    if (ctx.turnStatus.title === "twoTurned") {
+                        ctx.turnStatus.firstCard.isFaceUp = false;
+                        ctx.turnStatus.secondCard.isFaceUp = false;
                     }
-                    return { firstCard: null, secondCard: null }
+                    return { turnStatus: { title: "noneTurned" } as TurnStatus }
                 }),
                 afterFirstCard: assign({
-                    firstCard: (ctx, event) => {
+                    turnStatus: (ctx, event) => {
                         event.card.isFaceUp = true
-                        return event.card
+                        const thing: TurnStatus = {
+                            title: "oneTurned",
+                            firstCard: event.card
+                        }
+                        return thing
                     }
                 })
                 , afterSecondCard: assign({
-                    secondCard: (ctx, event) => {
+                    turnStatus: (ctx, event) => {
                         event.card.isFaceUp = true
-                        return event.card
+                        if (ctx.turnStatus.title === "oneTurned") {
+                            const thing: TurnStatus = {
+                                title: "twoTurned",
+                                firstCard: ctx.turnStatus.firstCard,
+                                secondCard: event.card
+                            }
+                            return thing
+                        } else {
+                            return ctx.turnStatus
+                        }
                     }
                 })
                 , redisplayCardsAtGameOver: assign((ctx, event) => {
