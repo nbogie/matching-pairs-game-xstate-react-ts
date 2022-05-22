@@ -8,7 +8,7 @@ import { createMachine, assign } from "xstate";
 export interface PairsGameContext {
     firstCard: Card | null;
     secondCard: Card | null;
-    allCards: Card[]
+    allCards: Card[],
 }
 type PairEvents =
     | { type: "clickCard", card: Card }
@@ -80,7 +80,7 @@ const pairsMachine =
                 }
             },
             GameOverAndReview: {
-                entry: () => console.log("GAME OVER!"),
+                entry: "redisplayCardsAtGameOver",
                 after: {
                     2000: {
                         target: "AwaitStart"
@@ -99,7 +99,7 @@ const pairsMachine =
                 setupGame: assign(() => ({
                     firstCard: null,
                     secondCard: null,
-                    allCards: makeEmojisDeck()
+                    allCards: makeEmojisDeck(),
                 })),
                 onPairSuccess: assign((ctx, event) => {
                     //TODO: can't we have TS know that first and second card are
@@ -127,6 +127,18 @@ const pairsMachine =
                     secondCard: (ctx, event) => {
                         event.card.isFaceUp = true
                         return event.card
+                    }
+                })
+                , redisplayCardsAtGameOver: assign((ctx, event) => {
+                    ctx.allCards.forEach(c => {
+                        c.isFaceUp = true
+                        c.isRemoved = false
+                    })
+                    const newAllCards = [...ctx.allCards]
+                    return {
+                        firstCard: null,
+                        secondCard: null,
+                        allCards: newAllCards
                     }
                 })
             }

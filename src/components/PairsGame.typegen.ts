@@ -8,6 +8,7 @@ export interface Typegen0 {
     afterSecondCard: "clickCard";
     onPairFailure: "xstate.after(400)#PairsGameMain.GotSecondCard";
     onPairSuccess: "xstate.after(400)#PairsGameMain.GotSecondCard";
+    redisplayCardsAtGameOver: "xstate.after(1)#PairsGameMain.HandlePairSuccess";
   };
   internalEvents: {
     "xstate.after(2000)#PairsGameMain.GameOverAndReview": {
