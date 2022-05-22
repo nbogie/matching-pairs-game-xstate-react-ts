@@ -1,56 +1,171 @@
-import React, { useEffect, useState } from 'react';
-import { Leaderboard, LeaderboardEntry, LeaderboardView } from './Leaderboard';
+import React, { useState } from 'react';
 import { Card, CardView } from './Card';
 import { makeEmojisDeck } from './Deck';
-// import { useKeyPress } from './useKeyPress';
+import { useMachine } from '@xstate/react';
+import { inspect } from '@xstate/inspect';
+import { createMachine, assign } from "xstate";
 
-//differentiated union type
-/** Whether a card has been turned, or two, or none yet.*/
+export interface PairsGameContext {
+    clickCount: number;
+    firstCard: Card | null;
+    secondCard: Card | null;
+    allCards: Card[]
+}
+type PairEvents =
+    | { type: "advance" }
+    | { type: "clickCard", card: Card }
+    | { type: "startGame" };
+
+inspect({ iframe: false });
+const pairsMachine =
+    createMachine({
+        schema: { context: {} as PairsGameContext, events: {} as PairEvents },
+        id: "PairsGameMain",
+        initial: "AwaitStart",
+        tsTypes: {} as import("./PairsGame.typegen").Typegen0,
+        states: {
+            AwaitStart: {
+                entry: assign({
+                    clickCount: 0,
+                    firstCard: null,
+                    secondCard: null,
+                    allCards: []
+                }),
+                on: {
+                    startGame: {
+                        target: "WaitFirstCard",
+                    },
+                },
+            },
+            WaitFirstCard: {
+                entry: assign({
+                    clickCount: (ctx: PairsGameContext, event) => ctx.clickCount + 1,
+                }),
+                on: {
+                    clickCard: {
+                        target: "WaitSecondCard",
+                    },
+                },
+            },
+            WaitSecondCard: {
+                entry: "afterFirstCard",
+                on: {
+                    clickCard: {
+                        target: "GotSecondCard",
+                    },
+                },
+            },
+            GotSecondCard: {
+                entry: "afterSecondCard",
+                after: {
+                    800: [
+                        {
+                            target: "HandlePairSuccess",
+                            cond: "pairMatch"
+                        },
+                        { target: "HandlePairFailure" }
+                    ]
+                },
+            },
+            HandlePairFailure: {
+                entry: "onPairFailure",
+                after: {
+                    1000: {
+                        target: "WaitFirstCard",
+                    }
+                }
+            },
+            HandlePairSuccess: {
+                entry: "onPairSuccess",
+                after: {
+                    300: [
+                        {
+                            target: "GameOverAndReview",
+                            cond: "isGameOver"
+                        }, {
+                            target: "WaitFirstCard",
+                        },
+                    ]
+                }
+            },
+            GameOverAndReview: {
+                on: {
+                    advance: {
+                        target: "AwaitStart",
+                    },
+                },
+            },
+        },
+    },
+        {
+            guards: {
+                pairMatch: (ctx, event) => ctx.firstCard?.emoji === ctx.secondCard?.emoji,
+                isGameOver: (ctx, event) => ctx.allCards.every(c => c.isRemoved)
+            },
+            actions: {
+                onPairSuccess: assign((ctx, event) => {
+                    if (ctx.firstCard && ctx.secondCard) {
+                        ctx.firstCard.isRemoved = true;
+                        ctx.secondCard.isRemoved = true;
+                    }
+                    return { firstCard: null, secondCard: null }
+                }),
+                onPairFailure: assign((ctx, event) => {
+                    if (ctx.firstCard && ctx.secondCard) {
+                        ctx.firstCard.isFaceUp = false;
+                        ctx.secondCard.isFaceUp = false;
+                    }
+                    return { firstCard: null, secondCard: null }
+                }),
+                afterFirstCard: assign({
+                    clickCount: (ctx, event) => ctx.clickCount + 1,
+                    firstCard: (ctx, event) => {
+                        event.card.isFaceUp = true
+                        return event.card
+                    }
+                })
+                , afterSecondCard: assign({
+                    clickCount: (ctx, event) => ctx.clickCount + 1,
+                    secondCard: (ctx, event) => {
+                        event.card.isFaceUp = true
+                        return event.card
+                    }
+                })
+            }
+        });
+
+
 type TurnStatus =
     | { title: 'noneTurned' }
     | { title: 'oneTurned'; firstCard: Card }
     | { title: 'twoTurned'; firstCard: Card; secondCard: Card };
 
 export default function PairsGame() {
+    const [current, send] = useMachine(pairsMachine, { devTools: true });
+    // const active = current.matches("active");
 
-    const [timeSinceFirstLoad, setTimeSinceFirstLoad] = useState(0);
-    const [timeOfGameStart, setTimeOfGameStart] = useState<null | number>(null);
-    const [clickCount, setClickCount] = useState(0);
+    const { clickCount } = current.context;
+    const stateName = current.value;
+
     const [turnStatus, setTurnStatus] = useState<TurnStatus>({
         title: 'noneTurned'
     });
 
-    const [leaderboard, setLeaderboard] = useState<Leaderboard>([]);
     const [deck, setDeck] = useState<Card[]>(makeEmojisDeck());
     // const rPressed= useKeyPress("r", handleKeyDown);
 
-    //increase timeSinceFirstLoad
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setTimeSinceFirstLoad(et => et + 1);
-        }, 1000)
-        return () => clearInterval(interval);
-    }, []);
+
 
     function resetGame() {
-        setClickCount(0);
+        // setClickCount(0);
         setDeck(makeEmojisDeck());
         setTurnStatus({ title: 'noneTurned' });
-        setTimeOfGameStart(timeSinceFirstLoad);
     }
 
     function cardsRemain() {
         return deck.filter(c => !c.isRemoved).length > 0;
     }
 
-    function processScore() {
-        const entry: LeaderboardEntry = { elapsedTime: timeSinceFirstLoad - (timeOfGameStart || 0), clickCount, at: new Date() };
-        setLeaderboard((prevBoard: Leaderboard) => {
-            const newBoard = [...prevBoard, entry];
-            newBoard.sort((e1, e2) => e1.elapsedTime - e2.elapsedTime)
-            return newBoard;
-        })
-    }
 
     // function handleKeyDown() {
     //     // Stale closure - this function definition is passed around and has closure over the var environment of a previous invocation of the PairsGame component function execution,
@@ -76,7 +191,6 @@ export default function PairsGame() {
             b.isFaceUp = false;
             setTurnStatus({ title: 'noneTurned' });
             if (!cardsRemain()) {
-                processScore();
                 resetGame();
             }
         }
@@ -105,7 +219,6 @@ export default function PairsGame() {
         }
 
         c.isFaceUp = true;
-        setClickCount(prev => prev + 1);
 
         if (turnStatus.title === 'noneTurned') {
             setTurnStatus({ title: 'oneTurned', firstCard: c });
@@ -117,18 +230,25 @@ export default function PairsGame() {
         }
     }
 
-
     return (
         <div className="mat" onClick={handleClickOnMat}>
             <div className="cardset">
                 {deck.map((c, ix) => (
-                    <CardView card={c} key={ix} handleClickCard={handleClickCard} />
+                    <CardView card={c} key={ix} handleClickCard={
+                        () => {
+                            console.log("clicked card: ", c)
+                            send({ type: "clickCard", card: c });
+                        }
+                    } />
                 ))}
             </div>
-            <div>TurnStatus: {turnStatus.title}</div>
+            {stateName === "AwaitStart" && <button onClick={() => send("startGame")} >Start game</button>}
+            <div>Game State: {current.value}</div>
+            <div>First Card: {current.context.firstCard?.emoji}</div>
+            <div>Second Card: {current.context.secondCard?.emoji}</div>
             <div>Click count: {clickCount}</div>
-            {timeOfGameStart && <div>Elapsed Time: {timeSinceFirstLoad - timeOfGameStart}</div>}
-            <LeaderboardView leaderboard={leaderboard} />
+            {true && <pre>{JSON.stringify(current, null, 2)}</pre>}
+
         </div>
     );
 }
